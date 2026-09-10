@@ -1,0 +1,17 @@
+{
+    "emotion_labels": {
+        "0": "Neutral",
+        "1": "Anger",
+        "2": "Disgust",
+        "3": "Fear",
+        "4": "Happiness",
+        "5": "Sadness",
+        "6": "Surprise"
+    },
+    "dialogue_act_labels": {
+        "0": "Inform",
+        "1": "Question",
+        "2": "Directive",
+        "3": "Commissive"
+    }
+}

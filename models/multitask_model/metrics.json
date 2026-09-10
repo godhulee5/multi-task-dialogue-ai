@@ -1,0 +1,20 @@
+{
+    "dialogue_act": {
+        "accuracy": 0.8116279069767441,
+        "precision": 0.8259276128575181,
+        "recall": 0.8116279069767441,
+        "f1": 0.815694007262153
+    },
+    "emotion": {
+        "accuracy": 0.8007751937984496,
+        "precision": 0.8472356904106263,
+        "recall": 0.8007751937984496,
+        "f1": 0.8173935818855411
+    },
+    "training": {
+        "epochs": 4,
+        "batch_size": 32,
+        "learning_rate": 2e-05,
+        "max_length": 64
+    }
+}

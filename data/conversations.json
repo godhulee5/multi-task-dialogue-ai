@@ -1,0 +1,102 @@
+[
+  {
+    "conversation_id": "live_20260910001013",
+    "text": "Hey! My order is not yet  delivered",
+    "emotion": "Neutral",
+    "dialogue_act": "Inform",
+    "priority": "Low",
+    "emotion_confidence": 0.5096104741096497,
+    "dialogue_confidence": 0.45918452739715576,
+    "timestamp": "2026-09-10 00:10:13"
+  },
+  {
+    "conversation_id": "live_20260910001344",
+    "text": "I am writing to report a defect with a product I recently purchased. On 2 September I ordered a Phone cover, order number 112, and it was delivered on 12 September. Unfortunately, the item I received is defective. Specifically,  the color which i ordered was not the one I ordered, there is a crack in the case. To resolve this, I would like a refund. Please let me know the next steps for returning the defective item",
+    "emotion": "Neutral",
+    "dialogue_act": "Directive",
+    "priority": "Medium",
+    "emotion_confidence": 0.8840007781982422,
+    "dialogue_confidence": 0.6435191631317139,
+    "timestamp": "2026-09-10 00:13:44"
+  },
+  {
+    "conversation_id": "live_20260910001726",
+    "text": "I am extremely angry. My payment has failed three times and nobody is helping me!",
+    "emotion": "Anger",
+    "dialogue_act": "Inform",
+    "priority": "High",
+    "emotion_confidence": 0.9259145259857178,
+    "dialogue_confidence": 0.8693569898605347,
+    "timestamp": "2026-09-10 00:17:26"
+  },
+  {
+    "conversation_id": "live_20260910002006",
+    "text": "Thank you for your help.",
+    "emotion": "Happiness",
+    "dialogue_act": "Inform",
+    "priority": "Low",
+    "emotion_confidence": 0.8618800044059753,
+    "dialogue_confidence": 0.5300406217575073,
+    "timestamp": "2026-09-10 00:20:06"
+  },
+  {
+    "conversation_id": "live_20260910002115",
+    "text": "Can you tell me when my order will be delivered?",
+    "emotion": "Neutral",
+    "dialogue_act": "Directive",
+    "priority": "Medium",
+    "emotion_confidence": 0.9826053380966187,
+    "dialogue_confidence": 0.7813783288002014,
+    "timestamp": "2026-09-10 00:21:15"
+  },
+  {
+    "conversation_id": "live_20260910002132",
+    "text": "I am extremely angry! My payment has failed three times and nobody is helping me!",
+    "emotion": "Anger",
+    "dialogue_act": "Inform",
+    "priority": "High",
+    "emotion_confidence": 0.9460347890853882,
+    "dialogue_confidence": 0.8492907881736755,
+    "timestamp": "2026-09-10 00:21:33"
+  },
+  {
+    "conversation_id": "live_20260910002204",
+    "text": "Please cancel my order immediately.",
+    "emotion": "Neutral",
+    "dialogue_act": "Directive",
+    "priority": "Medium",
+    "emotion_confidence": 0.9244825839996338,
+    "dialogue_confidence": 0.9022791385650635,
+    "timestamp": "2026-09-10 00:22:04"
+  },
+  {
+    "conversation_id": "live_20260910002445",
+    "text": "I am extremely angry! Your company has charged me multiple times and nobody is helping me!",
+    "emotion": "Anger",
+    "dialogue_act": "Inform",
+    "priority": "High",
+    "emotion_confidence": 0.9590468406677246,
+    "dialogue_confidence": 0.8288905620574951,
+    "timestamp": "2026-09-10 00:24:45"
+  },
+  {
+    "conversation_id": "live_20260910003236",
+    "text": "I am very happy with your service.",
+    "emotion": "Happiness",
+    "dialogue_act": "Inform",
+    "priority": "Low",
+    "emotion_confidence": 0.9224426746368408,
+    "dialogue_confidence": 0.9087252020835876,
+    "timestamp": "2026-09-10 00:32:36"
+  },
+  {
+    "conversation_id": "live_20260910003634",
+    "text": "How can I reset my account password?",
+    "emotion": "Neutral",
+    "dialogue_act": "Question",
+    "priority": "Low",
+    "emotion_confidence": 0.9825419187545776,
+    "dialogue_confidence": 0.9863357543945312,
+    "timestamp": "2026-09-10 00:36:34"
+  }
+]
