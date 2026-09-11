@@ -22,6 +22,11 @@ from huggingface_hub import snapshot_download
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
+# IMPORTANT:
+# Kept for compatibility with existing pages such as
+# 8_Model_Performance.py
+MODEL_DIR = BASE_DIR / "models" / "multitask_model"
+
 
 # ============================================================
 # HUGGING FACE MODEL
@@ -29,7 +34,13 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 
 HF_REPO_ID = "Godhulee/customer-support-multitask-distilbert"
 
-# Download only the files required by the application
+HF_REVISION = "main"
+
+
+# ============================================================
+# FILES TO DOWNLOAD FROM HUGGING FACE
+# ============================================================
+
 HF_ALLOW_PATTERNS = [
     "model.pt",
     "config.json",
@@ -43,7 +54,7 @@ HF_ALLOW_PATTERNS = [
 
 
 # ============================================================
-# DEFAULT LABELS
+# DEFAULT DIALOGUE ACT LABELS
 # ============================================================
 
 DEFAULT_DIALOGUE = {
@@ -52,6 +63,11 @@ DEFAULT_DIALOGUE = {
     2: "Directive",
     3: "Commissive"
 }
+
+
+# ============================================================
+# DEFAULT EMOTION LABELS
+# ============================================================
 
 DEFAULT_EMOTION = {
     0: "Neutral",
@@ -65,6 +81,21 @@ DEFAULT_EMOTION = {
 
 
 # ============================================================
+# MODEL CONSTANTS
+# ============================================================
+
+BASE_MODEL_NAME = "distilbert-base-uncased"
+
+MAX_LENGTH = 64
+
+DROPOUT = 0.3
+
+NUM_DIALOGUE_LABELS = 4
+
+NUM_EMOTION_LABELS = 7
+
+
+# ============================================================
 # MULTI-TASK CONFIGURATION
 # ============================================================
 
@@ -74,13 +105,15 @@ class MultiTaskConfig(PretrainedConfig):
 
     def __init__(
         self,
-        num_dialogue_labels=4,
-        num_emotion_labels=7,
+        num_dialogue_labels=NUM_DIALOGUE_LABELS,
+        num_emotion_labels=NUM_EMOTION_LABELS,
         **kwargs
     ):
+
         super().__init__(**kwargs)
 
         self.num_dialogue_labels = num_dialogue_labels
+
         self.num_emotion_labels = num_emotion_labels
 
 
@@ -96,27 +129,48 @@ class MultiTaskModel(PreTrainedModel):
 
         super().__init__(config)
 
-        # Same base model used during training
+        # ----------------------------------------------------
+        # SHARED DISTILBERT ENCODER
+        # ----------------------------------------------------
+
         self.encoder = AutoModel.from_pretrained(
-            "distilbert-base-uncased"
+            BASE_MODEL_NAME
         )
 
-        # Same dropout used during training
-        self.dropout = nn.Dropout(0.3)
+        # ----------------------------------------------------
+        # DROPOUT
+        # ----------------------------------------------------
+
+        self.dropout = nn.Dropout(DROPOUT)
+
+        # ----------------------------------------------------
+        # HIDDEN SIZE
+        # ----------------------------------------------------
 
         hidden_size = self.encoder.config.hidden_size
 
-        # Dialogue Act Classification Head
+        # ----------------------------------------------------
+        # DIALOGUE ACT CLASSIFICATION HEAD
+        # ----------------------------------------------------
+
         self.dialogue_classifier = nn.Linear(
             hidden_size,
             config.num_dialogue_labels
         )
 
-        # Emotion Classification Head
+        # ----------------------------------------------------
+        # EMOTION CLASSIFICATION HEAD
+        # ----------------------------------------------------
+
         self.emotion_classifier = nn.Linear(
             hidden_size,
             config.num_emotion_labels
         )
+
+
+    # ========================================================
+    # FORWARD PASS
+    # ========================================================
 
     def forward(
         self,
@@ -126,29 +180,47 @@ class MultiTaskModel(PreTrainedModel):
         emotion_labels=None
     ):
 
-        # Shared DistilBERT encoder
+        # ----------------------------------------------------
+        # SHARED DISTILBERT ENCODER
+        # ----------------------------------------------------
+
         outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask
         )
 
-        # CLS representation
+        # ----------------------------------------------------
+        # CLS REPRESENTATION
+        # ----------------------------------------------------
+
         pooled = outputs.last_hidden_state[:, 0]
 
-        # Dropout
+        # ----------------------------------------------------
+        # DROPOUT
+        # ----------------------------------------------------
+
         pooled = self.dropout(pooled)
 
-        # Dialogue Act prediction
+        # ----------------------------------------------------
+        # DIALOGUE ACT PREDICTION
+        # ----------------------------------------------------
+
         dialogue_logits = self.dialogue_classifier(
             pooled
         )
 
-        # Emotion prediction
+        # ----------------------------------------------------
+        # EMOTION PREDICTION
+        # ----------------------------------------------------
+
         emotion_logits = self.emotion_classifier(
             pooled
         )
 
-        # Optional training loss
+        # ----------------------------------------------------
+        # OPTIONAL TRAINING LOSS
+        # ----------------------------------------------------
+
         loss = None
 
         if (
@@ -166,8 +238,12 @@ class MultiTaskModel(PreTrainedModel):
                 emotion_labels
             )
 
-            # Multi-task joint loss
+            # Joint Multi-Task Loss
             loss = dialogue_loss + emotion_loss
+
+        # ----------------------------------------------------
+        # RETURN OUTPUTS
+        # ----------------------------------------------------
 
         return {
             "loss": loss,
@@ -191,7 +267,7 @@ def download_model_repository():
             repo_id=HF_REPO_ID,
             repo_type="model",
             allow_patterns=HF_ALLOW_PATTERNS,
-            revision="main"
+            revision=HF_REVISION
         )
 
         return Path(model_path)
@@ -199,8 +275,8 @@ def download_model_repository():
     except Exception as e:
 
         st.error(
-            "Unable to download the trained model from "
-            "Hugging Face."
+            "Unable to download the trained model "
+            "from Hugging Face."
         )
 
         st.exception(e)
@@ -209,16 +285,17 @@ def download_model_repository():
 
 
 # ============================================================
-# MODEL FILE HASH
+# MODEL FILE HASH / FINGERPRINT
 # ============================================================
 
 def get_model_fingerprint(model_file):
 
     """
-    Creates SHA256 fingerprint of model.pt.
+    Creates a SHA256 fingerprint of model.pt.
 
-    This helps verify that VS Code and Streamlit Cloud
-    are using the same trained model weights.
+    This is useful for checking whether the model
+    running locally and the model running on
+    Streamlit Cloud are identical.
     """
 
     sha256 = hashlib.sha256()
@@ -239,80 +316,116 @@ def get_model_fingerprint(model_file):
         return sha256.hexdigest()
 
     except Exception:
+
         return "Unavailable"
+
+
+# ============================================================
+# LOAD JSON FILE SAFELY
+# ============================================================
+
+def _load_json_file(file_path):
+
+    """
+    Safely loads a JSON file.
+    Returns {} if the file does not exist
+    or cannot be read.
+    """
+
+    file_path = Path(file_path)
+
+    if not file_path.exists():
+        return {}
+
+    try:
+
+        return json.loads(
+            file_path.read_text(
+                encoding="utf-8"
+            )
+        )
+
+    except Exception:
+
+        return {}
 
 
 # ============================================================
 # LOAD METADATA
 # ============================================================
 
-def load_metadata(model_dir):
+def load_metadata(model_dir=None):
 
-    labels = {}
-    metrics = {}
-    config = {}
+    """
+    Loads:
+
+    - labels.json
+    - metrics.json
+    - config.json
+
+    model_dir is optional.
+
+    If no directory is supplied, the Hugging Face
+    repository is downloaded automatically.
+
+    This keeps compatibility with pages that call:
+
+        load_metadata()
+
+    and pages that call:
+
+        load_metadata(model_dir)
+    """
 
     # --------------------------------------------------------
-    # File paths
+    # DOWNLOAD MODEL IF DIRECTORY WAS NOT PROVIDED
+    # --------------------------------------------------------
+
+    if model_dir is None:
+
+        model_dir = download_model_repository()
+
+    # --------------------------------------------------------
+    # DOWNLOAD FAILED
+    # --------------------------------------------------------
+
+    if model_dir is None:
+
+        return (
+            DEFAULT_DIALOGUE.copy(),
+            DEFAULT_EMOTION.copy(),
+            {},
+            {}
+        )
+
+    # --------------------------------------------------------
+    # CONVERT TO PATH
+    # --------------------------------------------------------
+
+    model_dir = Path(model_dir)
+
+    # --------------------------------------------------------
+    # JSON FILES
     # --------------------------------------------------------
 
     labels_file = model_dir / "labels.json"
+
     metrics_file = model_dir / "metrics.json"
+
     config_file = model_dir / "config.json"
 
     # --------------------------------------------------------
-    # Load labels
+    # LOAD FILES
     # --------------------------------------------------------
 
-    if labels_file.exists():
+    labels = _load_json_file(labels_file)
 
-        try:
+    metrics = _load_json_file(metrics_file)
 
-            labels = json.loads(
-                labels_file.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-        except Exception:
-            labels = {}
+    config = _load_json_file(config_file)
 
     # --------------------------------------------------------
-    # Load metrics
-    # --------------------------------------------------------
-
-    if metrics_file.exists():
-
-        try:
-
-            metrics = json.loads(
-                metrics_file.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-        except Exception:
-            metrics = {}
-
-    # --------------------------------------------------------
-    # Load configuration
-    # --------------------------------------------------------
-
-    if config_file.exists():
-
-        try:
-
-            config = json.loads(
-                config_file.read_text(
-                    encoding="utf-8"
-                )
-            )
-
-        except Exception:
-            config = {}
-
-    # --------------------------------------------------------
-    # Dialogue labels
+    # DIALOGUE ACT LABELS
     # --------------------------------------------------------
 
     dialogue_labels = labels.get(
@@ -320,13 +433,28 @@ def load_metadata(model_dir):
         DEFAULT_DIALOGUE
     )
 
-    dialogue = {
-        int(k): v
-        for k, v in dialogue_labels.items()
-    }
+    # Handle dictionary format
+    if isinstance(dialogue_labels, dict):
+
+        dialogue = {
+            int(k): v
+            for k, v in dialogue_labels.items()
+        }
+
+    # Handle list format
+    elif isinstance(dialogue_labels, list):
+
+        dialogue = {
+            i: value
+            for i, value in enumerate(dialogue_labels)
+        }
+
+    else:
+
+        dialogue = DEFAULT_DIALOGUE.copy()
 
     # --------------------------------------------------------
-    # Emotion labels
+    # EMOTION LABELS
     # --------------------------------------------------------
 
     emotion_labels = labels.get(
@@ -334,10 +462,29 @@ def load_metadata(model_dir):
         DEFAULT_EMOTION
     )
 
-    emotion = {
-        int(k): v
-        for k, v in emotion_labels.items()
-    }
+    # Handle dictionary format
+    if isinstance(emotion_labels, dict):
+
+        emotion = {
+            int(k): v
+            for k, v in emotion_labels.items()
+        }
+
+    # Handle list format
+    elif isinstance(emotion_labels, list):
+
+        emotion = {
+            i: value
+            for i, value in enumerate(emotion_labels)
+        }
+
+    else:
+
+        emotion = DEFAULT_EMOTION.copy()
+
+    # --------------------------------------------------------
+    # RETURN
+    # --------------------------------------------------------
 
     return (
         dialogue,
@@ -357,17 +504,21 @@ def load_metadata(model_dir):
 def load_model():
 
     # --------------------------------------------------------
-    # Download model
+    # DOWNLOAD MODEL REPOSITORY
     # --------------------------------------------------------
 
     model_dir = download_model_repository()
+
+    # --------------------------------------------------------
+    # CHECK DOWNLOAD
+    # --------------------------------------------------------
 
     if model_dir is None:
 
         return None, None, None
 
     # --------------------------------------------------------
-    # Model file
+    # MODEL FILE
     # --------------------------------------------------------
 
     model_file = model_dir / "model.pt"
@@ -375,13 +526,14 @@ def load_model():
     if not model_file.exists():
 
         st.error(
-            "model.pt was not found in the Hugging Face repository."
+            "model.pt was not found in the "
+            "Hugging Face repository."
         )
 
         return None, None, None
 
     # --------------------------------------------------------
-    # Load metadata
+    # LOAD METADATA
     # --------------------------------------------------------
 
     (
@@ -392,7 +544,7 @@ def load_model():
     ) = load_metadata(model_dir)
 
     # --------------------------------------------------------
-    # Create configuration
+    # DETERMINE NUMBER OF CLASSES
     # --------------------------------------------------------
 
     num_dialogue_labels = config_data.get(
@@ -405,25 +557,64 @@ def load_model():
         len(emotion)
     )
 
+    # Make sure values are integers
+    try:
+
+        num_dialogue_labels = int(
+            num_dialogue_labels
+        )
+
+    except Exception:
+
+        num_dialogue_labels = len(dialogue)
+
+    try:
+
+        num_emotion_labels = int(
+            num_emotion_labels
+        )
+
+    except Exception:
+
+        num_emotion_labels = len(emotion)
+
+    # --------------------------------------------------------
+    # CREATE CONFIGURATION
+    # --------------------------------------------------------
+
     config = MultiTaskConfig(
         num_dialogue_labels=num_dialogue_labels,
         num_emotion_labels=num_emotion_labels
     )
 
     # --------------------------------------------------------
-    # Create architecture
-    # --------------------------------------------------------
-
-    model = MultiTaskModel(config)
-
-    # --------------------------------------------------------
-    # Load trained weights
+    # CREATE MODEL ARCHITECTURE
     # --------------------------------------------------------
 
     try:
 
-        # weights_only is safer for a state_dict file.
-        # Fallback supports older PyTorch versions.
+        model = MultiTaskModel(config)
+
+    except Exception as e:
+
+        st.error(
+            "Unable to create the Multi-Task "
+            "DistilBERT model."
+        )
+
+        st.exception(e)
+
+        return None, None, None
+
+    # --------------------------------------------------------
+    # LOAD TRAINED WEIGHTS
+    # --------------------------------------------------------
+
+    try:
+
+        # ----------------------------------------------------
+        # Modern PyTorch
+        # ----------------------------------------------------
 
         try:
 
@@ -433,6 +624,10 @@ def load_model():
                 weights_only=True
             )
 
+        # ----------------------------------------------------
+        # Older PyTorch
+        # ----------------------------------------------------
+
         except TypeError:
 
             state = torch.load(
@@ -440,9 +635,9 @@ def load_model():
                 map_location="cpu"
             )
 
-        # Some training scripts save:
-        # {"state_dict": ...}
-        # Support both formats.
+        # ----------------------------------------------------
+        # SUPPORT DIFFERENT CHECKPOINT FORMATS
+        # ----------------------------------------------------
 
         if isinstance(state, dict):
 
@@ -453,6 +648,10 @@ def load_model():
             elif "model_state_dict" in state:
 
                 state = state["model_state_dict"]
+
+        # ----------------------------------------------------
+        # LOAD STATE DICTIONARY
+        # ----------------------------------------------------
 
         model.load_state_dict(
             state,
@@ -470,13 +669,13 @@ def load_model():
         return None, None, None
 
     # --------------------------------------------------------
-    # Evaluation mode
+    # EVALUATION MODE
     # --------------------------------------------------------
 
     model.eval()
 
     # --------------------------------------------------------
-    # Load tokenizer
+    # LOAD TOKENIZER
     # --------------------------------------------------------
 
     try:
@@ -497,7 +696,7 @@ def load_model():
         return None, None, None
 
     # --------------------------------------------------------
-    # Model fingerprint
+    # MODEL FINGERPRINT
     # --------------------------------------------------------
 
     fingerprint = get_model_fingerprint(
@@ -505,7 +704,7 @@ def load_model():
     )
 
     # --------------------------------------------------------
-    # Metadata
+    # COMPLETE METADATA
     # --------------------------------------------------------
 
     metadata = {
@@ -520,18 +719,34 @@ def load_model():
 
         "model_source": HF_REPO_ID,
 
+        "model_revision": HF_REVISION,
+
         "model_file": str(model_file),
 
         "model_fingerprint": fingerprint,
 
-        "base_model": "distilbert-base-uncased",
+        "base_model": BASE_MODEL_NAME,
 
-        "architecture":
+        "architecture": (
             "Shared DistilBERT Encoder + "
-            "Dialogue Act Head + Emotion Head",
+            "Dialogue Act Head + "
+            "Emotion Head"
+        ),
 
-        "max_length": 64
+        "max_length": MAX_LENGTH,
+
+        "dropout": DROPOUT,
+
+        "num_dialogue_labels":
+            num_dialogue_labels,
+
+        "num_emotion_labels":
+            num_emotion_labels
     }
+
+    # --------------------------------------------------------
+    # RETURN
+    # --------------------------------------------------------
 
     return (
         model,
@@ -541,17 +756,26 @@ def load_model():
 
 
 # ============================================================
-# CHECK MODEL READY
+# CHECK WHETHER MODEL IS READY
 # ============================================================
 
 def model_ready():
 
     try:
 
+        # ----------------------------------------------------
+        # DOWNLOAD / LOCATE MODEL
+        # ----------------------------------------------------
+
         model_dir = download_model_repository()
 
         if model_dir is None:
+
             return False
+
+        # ----------------------------------------------------
+        # REQUIRED FILES
+        # ----------------------------------------------------
 
         model_file = model_dir / "model.pt"
 
@@ -562,6 +786,10 @@ def model_ready():
         labels_file = (
             model_dir / "labels.json"
         )
+
+        # ----------------------------------------------------
+        # CHECK
+        # ----------------------------------------------------
 
         return (
             model_file.exists()
@@ -586,13 +814,13 @@ def get_model_info():
             "Customer Support Multi-Task DistilBERT",
 
         "base_model":
-            "distilbert-base-uncased",
+            BASE_MODEL_NAME,
 
         "dialogue_classes":
-            4,
+            NUM_DIALOGUE_LABELS,
 
         "emotion_classes":
-            7,
+            NUM_EMOTION_LABELS,
 
         "dialogue_labels":
             [
@@ -617,9 +845,49 @@ def get_model_info():
             HF_REPO_ID,
 
         "architecture":
-            "Shared DistilBERT Encoder + "
-            "Dialogue Act Head + Emotion Head",
+            (
+                "Shared DistilBERT Encoder + "
+                "Dialogue Act Head + "
+                "Emotion Head"
+            ),
 
         "max_length":
-            64
+            MAX_LENGTH,
+
+        "dropout":
+            DROPOUT
     }
+
+
+# ============================================================
+# OPTIONAL: GET MODEL FINGERPRINT AFTER LOADING
+# ============================================================
+
+def get_loaded_model_fingerprint():
+
+    """
+    Downloads the model repository if required
+    and returns the SHA256 fingerprint of model.pt.
+    """
+
+    try:
+
+        model_dir = download_model_repository()
+
+        if model_dir is None:
+
+            return "Unavailable"
+
+        model_file = model_dir / "model.pt"
+
+        if not model_file.exists():
+
+            return "Unavailable"
+
+        return get_model_fingerprint(
+            model_file
+        )
+
+    except Exception:
+
+        return "Unavailable"
